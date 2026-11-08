@@ -63,7 +63,7 @@ func newHTTPClient(caFile string) (*http.Client, error) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.Proxy = http.ProxyFromEnvironment // honors HTTPS_PROXY / NO_PROXY for the agent's own egress
 	if caFile != "" {
-		pem, err := os.ReadFile(caFile)
+		pem, err := os.ReadFile(caFile) //nolint:gosec // G304: the path is operator-supplied configuration
 		if err != nil {
 			return nil, fmt.Errorf("read CA file: %w", err)
 		}
@@ -133,7 +133,8 @@ func (c *Client) logSessionEnd(err error) {
 }
 
 func jitter(d time.Duration) time.Duration {
-	return time.Duration(float64(d) * (0.8 + 0.4*rand.Float64()))
+	// Jitter only spreads out reconnects; it needs no cryptographic randomness.
+	return time.Duration(float64(d) * (0.8 + 0.4*rand.Float64())) //nolint:gosec // G404
 }
 
 // runOnce opens one session and serves it until it ends.
@@ -144,7 +145,7 @@ func (c *Client) runOnce(ctx context.Context) error {
 	}
 	sess, sctx := c.newSession(ctx, ws)
 	defer sess.cancel(nil)
-	defer ws.CloseNow()
+	defer func() { _ = ws.CloseNow() }()
 	defer sess.closeAll()
 
 	ready, err := sess.handshake()
@@ -175,6 +176,9 @@ func (c *Client) dial(ctx context.Context) (*websocket.Conn, error) {
 	hdr.Set("User-Agent", "dsui-agent/"+c.version)
 	hdr.Set("X-DSUI-Protocol", fmt.Sprint(protocol.Version))
 	ws, resp, err := websocket.Dial(dctx, url, &websocket.DialOptions{HTTPClient: c.http, HTTPHeader: hdr})
+	if resp != nil && resp.Body != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 	if err != nil {
 		if resp != nil {
 			switch resp.StatusCode {

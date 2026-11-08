@@ -15,10 +15,10 @@ lint:
 
 # Local image without GoReleaser: build a linux binary for the host arch and wrap it.
 docker:
-	rm -rf .docker-ctx && mkdir .docker-ctx
-	CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "$(LDFLAGS)" -o .docker-ctx/dsui-agent ./cmd/dsui-agent
+	rm -rf .docker-ctx && mkdir -p .docker-ctx/linux/$(shell go env GOARCH)
+	CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "$(LDFLAGS)" -o .docker-ctx/linux/$(shell go env GOARCH)/dsui-agent ./cmd/dsui-agent
 	cp Dockerfile .docker-ctx/Dockerfile
-	docker build -t dsui-agent:local .docker-ctx
+	docker build --platform linux/$(shell go env GOARCH) -t dsui-agent:local .docker-ctx
 	rm -rf .docker-ctx
 
 helm-lint:

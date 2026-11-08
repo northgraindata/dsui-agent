@@ -54,6 +54,7 @@ nfpms:
   - id: packages
     package_name: dsui-agent
     vendor: Northgrain Data
+    maintainer: Northgrain Data <joachim@northgraindata.com>
     homepage: https://github.com/northgraindata/dsui-agent
     description: Outbound-only connector that gives a DSUI instance access to private data sources.
     license: Apache-2.0
@@ -68,48 +69,27 @@ nfpms:
     scripts:
       postinstall: deploy/systemd/postinstall.sh
 
-dockers:
-  - id: amd64
-    goos: linux
-    goarch: amd64
-    use: buildx
+dockers_v2:
+  - id: image
+    ids: [dsui-agent]
     dockerfile: Dockerfile
-    image_templates:
-      - "ghcr.io/northgraindata/dsui-agent:{{ .Version }}-amd64"
-    build_flag_templates:
-      - --platform=linux/amd64
-      - --label=org.opencontainers.image.source=https://github.com/northgraindata/dsui-agent
-      - --label=org.opencontainers.image.version={{ .Version }}
-      - --label=org.opencontainers.image.revision={{ .FullCommit }}
-      - --label=org.opencontainers.image.licenses=Apache-2.0
-  - id: arm64
-    goos: linux
-    goarch: arm64
-    use: buildx
-    dockerfile: Dockerfile
-    image_templates:
-      - "ghcr.io/northgraindata/dsui-agent:{{ .Version }}-arm64"
-    build_flag_templates:
-      - --platform=linux/arm64
-      - --label=org.opencontainers.image.source=https://github.com/northgraindata/dsui-agent
-      - --label=org.opencontainers.image.version={{ .Version }}
-      - --label=org.opencontainers.image.revision={{ .FullCommit }}
-      - --label=org.opencontainers.image.licenses=Apache-2.0
-
-docker_manifests:
-  - name_template: "ghcr.io/northgraindata/dsui-agent:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/northgraindata/dsui-agent:{{ .Version }}-amd64"
-      - "ghcr.io/northgraindata/dsui-agent:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/northgraindata/dsui-agent:latest"
-    skip_push: auto
-    image_templates:
-      - "ghcr.io/northgraindata/dsui-agent:{{ .Version }}-amd64"
-      - "ghcr.io/northgraindata/dsui-agent:{{ .Version }}-arm64"
+    images:
+      - ghcr.io/northgraindata/dsui-agent
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.source: https://github.com/northgraindata/dsui-agent
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.licenses: Apache-2.0
 
 docker_signs:
   - cmd: cosign
-    artifacts: manifests
+    artifacts: images
     output: true
     args: [sign, --yes, "${artifact}@${digest}"]
 

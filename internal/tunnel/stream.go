@@ -169,7 +169,7 @@ func (s *stream) grant(n int64) {
 	}
 	s.mu.Unlock()
 	if give > 0 {
-		_ = s.sess.send(protocol.Frame{Type: protocol.TypeWindow, Stream: s.id, Payload: protocol.WindowPayload(uint32(give))})
+		_ = s.sess.send(protocol.Frame{Type: protocol.TypeWindow, Stream: s.id, Payload: protocol.WindowPayload(uint32(give))}) //nolint:gosec // G115: bounded by the receive window, see onData
 	}
 }
 

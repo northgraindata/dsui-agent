@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
@@ -145,7 +146,7 @@ func echoServer(t *testing.T) net.Listener {
 				return
 			}
 			go func() {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				_, _ = io.Copy(c, c)
 			}()
 		}
@@ -372,7 +373,8 @@ func TestWrongTokenIsReportedAsServerError(t *testing.T) {
 	c := startAgentNoRun(t, f, "a:1")
 	c.cfg.Token = "wrong"
 	_, err := c.dial(context.Background())
-	se, ok := err.(*ServerError)
+	var se *ServerError
+	ok := errors.As(err, &se)
 	if !ok || se.Code != protocol.CodeUnauthorized {
 		t.Fatalf("expected unauthorized ServerError, got %T %v", err, err)
 	}
