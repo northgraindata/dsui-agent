@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/northgraindata/dsui-agent/internal/config"
 	"github.com/northgraindata/dsui-agent/internal/tunnel"
+	"github.com/northgraindata/dsui-agent/internal/ui"
 )
 
 // Set by GoReleaser: -X main.version=... -X main.commit=...
@@ -56,7 +58,7 @@ func run(args []string) int {
 		fmt.Printf("dsui-agent %s (%s)\n", version, commit)
 		return 0
 	case "help":
-		fmt.Print(usage)
+		printHelp()
 		return 0
 	case "run", "check":
 	default:
@@ -65,7 +67,7 @@ func run(args []string) int {
 	}
 	for _, a := range args {
 		if a == "-h" || a == "--help" {
-			fmt.Print(usage)
+			printHelp()
 			return 0
 		}
 	}
@@ -75,7 +77,16 @@ func run(args []string) int {
 		fmt.Fprintf(os.Stderr, "dsui-agent: %v\n\nRun `dsui-agent help` for usage.\n", err)
 		return 2
 	}
-	log := newLogger(cfg)
+	// Logs are always written. In an interactive terminal a start screen comes
+	// first; logs written meanwhile wait behind a gate and follow it in order.
+	fancy := ui.Enabled(os.Stderr, cfg.LogFormat, os.Getenv)
+	var logOut io.Writer = os.Stderr
+	var gate *ui.Gate
+	if fancy && cmd == "run" {
+		gate = ui.NewGate(os.Stderr)
+		logOut = gate
+	}
+	log := newLogger(cfg, logOut)
 
 	client, err := tunnel.New(cfg, log, version)
 	if err != nil {
@@ -87,6 +98,9 @@ func run(args []string) int {
 	defer stop()
 
 	if cmd == "check" {
+		if fancy {
+			ui.Show(os.Stderr, version, ui.Width(os.Stderr), false)
+		}
 		failed := false
 		for _, r := range client.Check(ctx) {
 			mark := "ok  "
@@ -101,6 +115,20 @@ func run(args []string) int {
 		return 0
 	}
 
+	bannerDone := make(chan struct{})
+	if gate != nil {
+		// The tunnel connects while the range rises; nothing waits for it.
+		go func() {
+			defer close(bannerDone)
+			ui.Show(os.Stderr, version, ui.Width(os.Stderr), true)
+			_ = gate.Open()
+		}()
+	} else {
+		close(bannerDone)
+	}
+	// Whatever happens, held logs are flushed before the process exits.
+	defer func() { <-bannerDone }()
+
 	log.Info("starting dsui-agent", "version", version, "url", cfg.URL)
 	if err := client.Run(ctx); err != nil {
 		log.Error("agent stopped", "error", err)
@@ -110,14 +138,21 @@ func run(args []string) int {
 	return 0
 }
 
-func newLogger(cfg config.Config) *slog.Logger {
+func printHelp() {
+	if ui.Enabled(os.Stdout, "text", os.Getenv) {
+		ui.Show(os.Stdout, version, ui.Width(os.Stdout), false)
+	}
+	fmt.Print(usage)
+}
+
+func newLogger(cfg config.Config, out io.Writer) *slog.Logger {
 	var level slog.Level
 	if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
 		level = slog.LevelInfo
 	}
 	opts := &slog.HandlerOptions{Level: level}
 	if cfg.LogFormat == "json" {
-		return slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		return slog.New(slog.NewJSONHandler(out, opts))
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, opts))
+	return slog.New(slog.NewTextHandler(out, opts))
 }

@@ -151,6 +151,10 @@ dsui-agent check    verify config, DSUI access, token and each target, then exit
 dsui-agent version
 ```
 
+In an interactive terminal, `run`, `check` and `help` open with a short start screen.
+Anywhere else (Docker without `-t`, systemd, Kubernetes, CI), or with `NO_COLOR` or `--log-format json`, the output is the plain logs only.
+Logs are always written; lines logged during the start screen are held and printed right after it.
+
 `check` is the fastest way to debug a new install.
 It prints one line per step and exits non-zero when something fails.
 
