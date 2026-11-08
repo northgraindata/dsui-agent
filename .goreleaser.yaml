@@ -1,0 +1,102 @@
+version: 2
+
+project_name: dsui-agent
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: dsui-agent
+    main: ./cmd/dsui-agent
+    binary: dsui-agent
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - deploy/systemd/*
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
+
+# Keyless signature of the checksum file (verifies every archive through it).
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature=${signature}
+      - --output-certificate=${certificate}
+      - ${artifact}
+    certificate: "${artifact}.pem"
+
+nfpms:
+  - id: packages
+    package_name: dsui-agent
+    vendor: Northgrain Data
+    maintainer: Northgrain Data <joachim@northgraindata.com>
+    homepage: https://github.com/northgraindata/dsui-agent
+    description: Outbound-only connector that gives a DSUI instance access to private data sources.
+    license: Apache-2.0
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    contents:
+      - src: deploy/systemd/dsui-agent.service
+        dst: /lib/systemd/system/dsui-agent.service
+      - src: deploy/systemd/agent.yaml
+        dst: /etc/dsui-agent/agent.yaml
+        type: config|noreplace
+    scripts:
+      postinstall: deploy/systemd/postinstall.sh
+
+dockers_v2:
+  - id: image
+    ids: [dsui-agent]
+    dockerfile: Dockerfile
+    images:
+      - ghcr.io/northgraindata/dsui-agent
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.source: https://github.com/northgraindata/dsui-agent
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.licenses: Apache-2.0
+
+docker_signs:
+  - cmd: cosign
+    artifacts: images
+    output: true
+    args: [sign, --yes, "${artifact}@${digest}"]
+
+# release-please owns the GitHub release notes and CHANGELOG.md.
+changelog:
+  disable: true
+
+release:
+  mode: keep-existing
+  prerelease: auto
