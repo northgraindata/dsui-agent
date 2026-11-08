@@ -1,0 +1,17 @@
+# /etc/dsui-agent/agent.yaml
+# The token lives in /etc/dsui-agent/token (mode 0600, owned by root), see the unit file.
+
+# URL of your DSUI instance (the same address you open in the browser).
+url: https://dsui.example.com
+
+# Shown in DSUI next to this agent.
+name: datacenter-1
+
+# Everything DSUI may reach through this agent. Anything else is refused.
+targets:
+  - airflow.internal:8080
+  - clickhouse.internal:8123
+  - 10.20.0.0/16:5432
+
+log_format: text
+log_level: info

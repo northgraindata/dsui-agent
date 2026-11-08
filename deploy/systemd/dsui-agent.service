@@ -1,0 +1,34 @@
+[Unit]
+Description=DSUI agent
+Documentation=https://github.com/northgraindata/dsui-agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dsui-agent
+Group=dsui-agent
+ExecStart=/usr/bin/dsui-agent run --config /etc/dsui-agent/agent.yaml
+Restart=always
+RestartSec=5
+# The token is read from this file, never from the command line.
+LoadCredential=token:/etc/dsui-agent/token
+Environment=DSUI_TOKEN_FILE=%d/token
+# Uncomment when the agent must leave through a corporate proxy.
+# Environment=HTTPS_PROXY=http://proxy.corp.local:3128
+# Environment=NO_PROXY=localhost,127.0.0.1
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

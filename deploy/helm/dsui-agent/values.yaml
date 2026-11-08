@@ -1,0 +1,50 @@
+image:
+  repository: ghcr.io/northgraindata/dsui-agent
+  # Defaults to the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+dsui:
+  # URL of your DSUI instance, for example https://dsui.example.com
+  url: ""
+
+# Display name in DSUI. Defaults to the release name.
+name: ""
+
+# Everything DSUI may reach through this agent, for example:
+#   - airflow-api.data.svc.cluster.local:8080
+#   - clickhouse.data.svc.cluster.local:8123
+#   - "*.rds.internal:5432"
+targets: []
+
+token:
+  # Name of an existing Secret holding the token under `key`. Preferred.
+  existingSecret: ""
+  key: token
+  # Inline token, only for quick tests: it ends up in the release values.
+  value: ""
+
+# Proxy for the agent's own outbound connection to DSUI.
+proxy:
+  https: ""
+  noProxy: ""
+
+# Extra CA bundle for reaching DSUI through a TLS-inspecting proxy.
+caBundle:
+  existingConfigMap: ""
+  key: ca.crt
+
+logFormat: json
+logLevel: info
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

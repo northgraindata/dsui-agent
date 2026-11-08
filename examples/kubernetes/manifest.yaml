@@ -1,0 +1,74 @@
+# Plain manifests, without Helm.
+#   kubectl create namespace dsui
+#   kubectl -n dsui create secret generic dsui-agent --from-literal=token='<token from DSUI>'
+#   kubectl apply -f manifest.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dsui-agent
+  namespace: dsui
+spec:
+  replicas: 1 # one agent per site
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dsui-agent
+  template:
+    metadata:
+      labels:
+        app: dsui-agent
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dsui-agent
+          image: ghcr.io/northgraindata/dsui-agent:latest
+          args: ["run"]
+          env:
+            - name: DSUI_URL
+              value: https://dsui.example.com
+            - name: DSUI_AGENT_NAME
+              value: prod-cluster
+            # Kubernetes service DNS names.
+            - name: DSUI_TARGETS
+              value: airflow-api.data.svc.cluster.local:8080,clickhouse.data.svc.cluster.local:8123
+            - name: DSUI_LOG_FORMAT
+              value: json
+            - name: DSUI_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dsui-agent
+                  key: token
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { memory: 128Mi }
+---
+# If you use NetworkPolicies, let the agent reach the targets and the internet on 443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dsui-agent
+  namespace: dsui
+spec:
+  podSelector:
+    matchLabels:
+      app: dsui-agent
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+    - ports:
+        - { port: 443, protocol: TCP }
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }

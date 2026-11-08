@@ -1,0 +1,97 @@
+{{- if not .Values.dsui.url }}{{ fail "dsui.url is required" }}{{ end }}
+{{- if not .Values.targets }}{{ fail "targets must list at least one host:port" }}{{ end }}
+{{- if not (or .Values.token.existingSecret .Values.token.value) }}{{ fail "set token.existingSecret (preferred) or token.value" }}{{ end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dsui-agent.fullname" . }}
+  labels:
+    {{- include "dsui-agent.labels" . | nindent 4 }}
+spec:
+  # One agent per site. More replicas would register the same agent twice.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "dsui-agent.labels" . | nindent 8 }}
+      annotations:
+        checksum/targets: {{ join "," .Values.targets | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dsui-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["run"]
+          env:
+            - name: DSUI_URL
+              value: {{ .Values.dsui.url | quote }}
+            - name: DSUI_AGENT_NAME
+              value: {{ .Values.name | default .Release.Name | quote }}
+            - name: DSUI_TARGETS
+              value: {{ join "," .Values.targets | quote }}
+            - name: DSUI_LOG_FORMAT
+              value: {{ .Values.logFormat | quote }}
+            - name: DSUI_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: DSUI_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dsui-agent.secretName" . }}
+                  key: {{ .Values.token.key }}
+            {{- if .Values.proxy.https }}
+            - name: HTTPS_PROXY
+              value: {{ .Values.proxy.https | quote }}
+            {{- end }}
+            {{- if .Values.proxy.noProxy }}
+            - name: NO_PROXY
+              value: {{ .Values.proxy.noProxy | quote }}
+            {{- end }}
+            {{- if .Values.caBundle.existingConfigMap }}
+            - name: DSUI_CA_FILE
+              value: /etc/dsui-agent/ca/{{ .Values.caBundle.key }}
+            {{- end }}
+          {{- if .Values.caBundle.existingConfigMap }}
+          volumeMounts:
+            - name: ca
+              mountPath: /etc/dsui-agent/ca
+              readOnly: true
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.caBundle.existingConfigMap }}
+      volumes:
+        - name: ca
+          configMap:
+            name: {{ .Values.caBundle.existingConfigMap }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

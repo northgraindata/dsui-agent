@@ -1,0 +1,9 @@
+apiVersion: v2
+name: dsui-agent
+description: Outbound-only connector that gives a DSUI instance access to data sources in this cluster.
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+home: https://github.com/northgraindata/dsui-agent
+sources:
+  - https://github.com/northgraindata/dsui-agent

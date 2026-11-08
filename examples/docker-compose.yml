@@ -1,0 +1,29 @@
+# Run the agent next to your services in the same Docker network.
+# Works the same on Docker, Compose, Coolify, Portainer, Dokploy or Swarm.
+#
+#   1. Create an agent in DSUI and copy its token into a `.env` file: DSUI_TOKEN=...
+#   2. Put the service names of your own stack in `targets`.
+#   3. docker compose up -d && docker compose logs -f dsui-agent
+
+services:
+  dsui-agent:
+    image: ghcr.io/northgraindata/dsui-agent:latest
+    restart: unless-stopped
+    environment:
+      DSUI_URL: https://dsui.example.com
+      DSUI_TOKEN: "${DSUI_TOKEN:?set DSUI_TOKEN in .env}"
+      DSUI_AGENT_NAME: my-compose-stack
+      # Service names as seen from inside this Compose network.
+      DSUI_TARGETS: airflow-api:8080,clickhouse:8123,postgres:5432
+      DSUI_LOG_FORMAT: json
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [default]
+    # Join the network of the stack you want to expose, for example:
+    # networks: [data]
+
+# networks:
+#   data:
+#     external: true
+#     name: my-existing-stack_default
