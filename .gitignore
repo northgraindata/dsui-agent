@@ -1,0 +1,8 @@
+/bin/
+/dist/
+/.docker-ctx/
+*.test
+.env
+*.pem
+agent.local.yaml
+.DS_Store
