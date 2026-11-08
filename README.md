@@ -44,9 +44,11 @@ Many DSUI services can share it, each pointing at a different host and port that
 | AWS ECS or EC2 | [Terraform example](examples/terraform-ecs/main.tf) |
 | Linux VM | `.deb` or `.rpm` from the [releases](https://github.com/northgraindata/dsui-agent/releases), or the tarball with the [systemd unit](deploy/systemd/dsui-agent.service) |
 | Windows | [Service with NSSM](examples/windows.md) |
-| macOS, other | tarball from the releases |
+| Linux, macOS | `curl -fsSL https://raw.githubusercontent.com/northgraindata/dsui-agent/main/install.sh \| sh` (verifies the checksum) |
+| Other | archive or bare binary from the releases |
 
-Release assets include checksums, a cosign signature of the checksums, and SBOMs.
+Every release lists its assets per platform (archives and bare binaries named `dsui-agent_<version>_<os>_<arch>`), checksums, a cosign signature of the checksums, and SBOMs.
+The release notes show how to verify them.
 
 ## Examples
 

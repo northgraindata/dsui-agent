@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/northgraindata/dsui-agent/internal/config"
@@ -15,10 +16,11 @@ import (
 	"github.com/northgraindata/dsui-agent/internal/ui"
 )
 
-// Set by GoReleaser: -X main.version=... -X main.commit=...
+// Set by GoReleaser: -X main.version=... -X main.commit=... -X main.date=...
 var (
 	version = "dev"
 	commit  = "none"
+	date    = "unknown"
 )
 
 const usage = `dsui-agent connects data sources in a private network to a DSUI instance.
@@ -55,7 +57,7 @@ func run(args []string) int {
 	}
 	switch cmd {
 	case "version":
-		fmt.Printf("dsui-agent %s (%s)\n", version, commit)
+		fmt.Printf("dsui-agent %s\ncommit: %s\nbuilt:  %s\nplatform: %s/%s\n", version, commit, date, runtime.GOOS, runtime.GOARCH)
 		return 0
 	case "help":
 		printHelp()

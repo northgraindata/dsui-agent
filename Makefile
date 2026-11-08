@@ -1,7 +1,7 @@
 VERSION ?= dev
-LDFLAGS := -s -w -X main.version=$(VERSION)
+LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(shell git rev-parse --short HEAD 2>/dev/null || echo none) -X main.date=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-.PHONY: build test lint docker helm-lint
+.PHONY: build test lint docker helm-lint snapshot
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/dsui-agent ./cmd/dsui-agent
@@ -23,3 +23,7 @@ docker:
 
 helm-lint:
 	helm lint deploy/helm/dsui-agent
+
+# Dry-run the whole release locally (no publish): archives, packages, notes in dist/.
+snapshot:
+	goreleaser release --snapshot --clean --skip=sign,sbom,docker

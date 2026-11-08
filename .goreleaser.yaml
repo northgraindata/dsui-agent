@@ -17,7 +17,7 @@ builds:
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }}
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }} -X main.date={{ .Date }}
 
 archives:
   - id: default
@@ -30,6 +30,12 @@ archives:
       - LICENSE
       - README.md
       - deploy/systemd/*
+
+  # Bare binaries with the platform in the name, for curl and for tools like
+  # `gh release download --pattern`. Covered by checksums.txt like everything else.
+  - id: raw
+    formats: [binary]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: checksums.txt
@@ -97,6 +103,82 @@ docker_signs:
 changelog:
   disable: true
 
+# Release-please writes the notes first; GoReleaser appends the install section.
 release:
-  mode: keep-existing
+  mode: append
   prerelease: auto
+  footer: |
+    ## Install
+
+    **Script (Linux, macOS)**
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/northgraindata/dsui-agent/{{ .Tag }}/install.sh | sh -s -- --version {{ .Tag }}
+    ```
+
+    **Docker**
+
+    ```sh
+    docker run --rm ghcr.io/northgraindata/dsui-agent:{{ .Version }} version
+    ```
+
+    **Kubernetes (Helm)**
+
+    ```sh
+    helm install dsui-agent oci://ghcr.io/northgraindata/charts/dsui-agent --version {{ .Version }} \
+      --set dsui.url=https://dsui.example.com \
+      --set token.existingSecret=dsui-agent-token \
+      --set 'targets[0]=airflow-api.data.svc.cluster.local:8080'
+    ```
+
+    **Debian, Ubuntu**
+
+    ```sh
+    curl -fsSLO https://github.com/northgraindata/dsui-agent/releases/download/{{ .Tag }}/dsui-agent_{{ .Version }}_linux_amd64.deb
+    sudo dpkg -i dsui-agent_{{ .Version }}_linux_amd64.deb
+    ```
+
+    **RHEL, Fedora, Amazon Linux**
+
+    ```sh
+    sudo rpm -i https://github.com/northgraindata/dsui-agent/releases/download/{{ .Tag }}/dsui-agent_{{ .Version }}_linux_amd64.rpm
+    ```
+
+    **Binary (Linux, macOS, Windows)**
+
+    ```sh
+    # pick your platform: linux|darwin|windows and amd64|arm64
+    curl -fsSL -o dsui-agent https://github.com/northgraindata/dsui-agent/releases/download/{{ .Tag }}/dsui-agent_{{ .Version }}_linux_amd64
+    chmod +x dsui-agent
+    ./dsui-agent check --url https://dsui.example.com --token-file ./token --targets airflow.internal:8080
+    ```
+
+    See the [README](https://github.com/northgraindata/dsui-agent#examples) for Compose, systemd, Windows and ECS.
+
+    ## Assets
+
+    | Platform | Archive | Bare binary |
+    | --- | --- | --- |
+    | Linux x86_64 | `dsui-agent_{{ .Version }}_linux_amd64.tar.gz` | `dsui-agent_{{ .Version }}_linux_amd64` |
+    | Linux arm64 | `dsui-agent_{{ .Version }}_linux_arm64.tar.gz` | `dsui-agent_{{ .Version }}_linux_arm64` |
+    | macOS Intel | `dsui-agent_{{ .Version }}_darwin_amd64.tar.gz` | `dsui-agent_{{ .Version }}_darwin_amd64` |
+    | macOS Apple silicon | `dsui-agent_{{ .Version }}_darwin_arm64.tar.gz` | `dsui-agent_{{ .Version }}_darwin_arm64` |
+    | Windows x86_64 | `dsui-agent_{{ .Version }}_windows_amd64.zip` | `dsui-agent_{{ .Version }}_windows_amd64.exe` |
+    | Windows arm64 | `dsui-agent_{{ .Version }}_windows_arm64.zip` | `dsui-agent_{{ .Version }}_windows_arm64.exe` |
+
+    `.deb` and `.rpm` packages exist for amd64 and arm64.
+
+    ## Verify
+
+    ```sh
+    sha256sum --ignore-missing -c checksums.txt
+
+    cosign verify-blob checksums.txt \
+      --certificate checksums.txt.pem --signature checksums.txt.sig \
+      --certificate-identity-regexp 'https://github.com/northgraindata/dsui-agent/' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+    cosign verify ghcr.io/northgraindata/dsui-agent:{{ .Version }} \
+      --certificate-identity-regexp 'https://github.com/northgraindata/dsui-agent/' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+    ```
